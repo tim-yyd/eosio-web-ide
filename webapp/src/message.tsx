@@ -8,30 +8,20 @@ import { JsSignatureProvider } from 'eosjs/dist/eosjs-jssig';
 
 const rpc = new JsonRpc(''); // nodeos and web server are on same port
 
-interface LikeData {
+interface PostData {
     id?: number;
     user?: string;
     reply_to?: number;
+    content?: string;
 };
 
-interface LikeFormState {
+interface PostFormState {
     privateKey: string;
-    data: LikeData;
+    data: PostData;
     error: string;
 };
 
-interface UnLikeData {
-    user?: string;
-    reply_to?: number;
-};
-
-interface UnLikeFormState {
-    privateKey: string;
-    data: UnLikeData;
-    error: string;
-};
-
-class LikeForm extends React.Component<{}, LikeFormState> {
+class PostForm extends React.Component<{}, PostFormState> {
     api: Api;
 
     constructor(props: {}) {
@@ -42,28 +32,25 @@ class LikeForm extends React.Component<{}, LikeFormState> {
             data: {
                 id: 0,
                 user: 'bob',
-                reply_to: 2000,
+                reply_to: 0,
+                content: 'This is a test'
             },
-            // unLikeData: {
-            //     user: 'bob',
-            //     reply_to: 2000,
-            // },
             error: '',
         };
     }
 
-    setData(data: LikeData) {
+    setData(data: PostData) {
         this.setState({ data: { ...this.state.data, ...data } });
     }
 
-    async like() {
+    async post() {
         try {
             this.api.signatureProvider = new JsSignatureProvider([this.state.privateKey]);
             const result = await this.api.transact(
                 {
                     actions: [{
                         account: 'talk',
-                        name: 'like',
+                        name: 'post',
                         authorization: [{
                             actor: this.state.data.user,
                             permission: 'active',
@@ -83,37 +70,7 @@ class LikeForm extends React.Component<{}, LikeFormState> {
                 this.setState({ error: '' + e });
         }
     }
-    async unlike() {
-        try {
-            this.api.signatureProvider = new JsSignatureProvider([this.state.privateKey]);
-            const unlikeData: UnLikeData =  {
-                user: this.state.data.user,
-                reply_to: this.state.data.reply_to,
-            }
-            const result = await this.api.transact(
-                {
-                    actions: [{
-                        account: 'talk',
-                        name: 'unlike',
-                        authorization: [{
-                            actor: this.state.data.user,
-                            permission: 'active',
-                        }],
-                        data: unlikeData,
-                    }]
-                }, {
-                    blocksBehind: 3,
-                    expireSeconds: 30,
-                });
-            console.log(result);
-            this.setState({ error: '' });
-        } catch (e) {
-            if (e.json)
-                this.setState({ error: JSON.stringify(e.json, null, 4) });
-            else
-                this.setState({ error: '' + e });
-        }
-    }
+
     render() {
         return <div>
             <table>
@@ -142,12 +99,18 @@ class LikeForm extends React.Component<{}, LikeFormState> {
                             onChange={e => this.setData({ reply_to: +e.target.value })}
                         /></td>
                     </tr>
+                    <tr>
+                        <td>Content</td>
+                        <td><input
+                            style={{ width: 500 }}
+                            value={this.state.data.content}
+                            onChange={e => this.setData({ content: e.target.value })}
+                        /></td>
+                    </tr>
                 </tbody>
             </table>
             <br />
-            <button onClick={e => this.like()}>Like</button>
-             <br />
-            <button onClick={e => this.unlike()}>UnLike</button>
+            <button onClick={e => this.post()}>Post</button>
             {this.state.error && <div>
                 <br />
                 Error:
@@ -157,7 +120,7 @@ class LikeForm extends React.Component<{}, LikeFormState> {
     }
 }
 
-class Likes extends React.Component<{}, { content: string }> {
+class Messages extends React.Component<{}, { content: string }> {
     interval: number;
 
     constructor(props: {}) {
@@ -169,16 +132,17 @@ class Likes extends React.Component<{}, { content: string }> {
         this.interval = window.setInterval(async () => {
             try {
                 const rows = await rpc.get_table_rows({
-                    json: true, code: 'talk', scope: '', table: 'likes', limit: 1000,
+                    json: true, code: 'talk', scope: '', table: 'message', limit: 1000,
                 });
                 let content =
-                    'id          reply_to      user \n' +
+                    'id          reply_to      user          content\n' +
                     '=============================================================\n';
                 for (let row of rows.rows)
                     content +=
                         (row.id + '').padEnd(12) +
                         (row.reply_to + '').padEnd(12) + '  ' +
-                        row.user.padEnd(14) + '\n';
+                        row.user.padEnd(14) +
+                        row.content + '\n';
                 this.setState({ content });
             } catch (e) {
                 if (e.json)
@@ -201,10 +165,10 @@ class Likes extends React.Component<{}, { content: string }> {
 
 ReactDOM.render(
     <div>
-        <LikeForm />
+        <PostForm />
         <br />
-        LikesList:
-        <Likes />
+        Messages:
+        <Messages />
     </div>,
     document.getElementById("example")
 );
